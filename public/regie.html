@@ -55,6 +55,18 @@
   .fout { color: var(--slecht); font-size: 14px; min-height: 1.2em; margin-top: 6px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--slecht); margin-right: 6px; }
   .dot.on { background: var(--goed); }
+
+  /* sessies */
+  .sessie { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 16px; }
+  .sessie .naam { font-size: 18px; font-weight: 700; }
+  .sessie form { display: flex; gap: 8px; flex: 1; min-width: 260px; }
+  .sessie form input { flex: 1; }
+  details.ses { border-top: 1px solid var(--line); padding: 8px 0; }
+  details.ses:first-child { border-top: 0; }
+  details.ses summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  details.ses summary::-webkit-details-marker { display: none; }
+  details.ses ol { margin: 8px 0; }
+  .label { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--goed); color: #fff; margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -76,12 +88,18 @@
     <div class="muted"><span class="dot" id="dot"></span><span id="conn">verbinden…</span></div>
   </header>
 
+  <section class="card sessie" id="sessie"></section>
+
   <div class="grid">
     <div>
       <section class="card actief" id="actief"></section>
       <section class="card" style="margin-top:16px">
-        <h2>Ranglijst</h2>
+        <h2>Ranglijst deze sessie</h2>
         <ol class="rang" id="rang"></ol>
+      </section>
+      <section class="card" style="margin-top:16px">
+        <h2>Sessies</h2>
+        <div id="sessies"></div>
       </section>
     </div>
 
@@ -117,7 +135,9 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   let pin = '';
   try { pin = sessionStorage.getItem('pin') || ''; } catch {}
-  let st = { jokes: [], jokeId: null, open: false };
+  let st = { jokes: [], jokeId: null, open: false, sessie: null, sessies: [] };
+  const fmtDatum = d => new Date(d + 'T12:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  const fmtTijd = iso => iso ? new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '';
   const socket = io({ autoConnect: false });
 
   $('url').textContent = location.host;
@@ -148,12 +168,60 @@
 
   function pct(s) { return s.totaal ? Math.round(100 * s.goed / s.totaal) : 0; }
 
+  function renderSessie() {
+    if (st.sessie) {
+      $('sessie').innerHTML =
+        '<div><h2 style="margin-bottom:4px">Sessie bezig</h2><div class="naam">' + esc(st.sessie.naam) + '</div>' +
+        '<div class="muted">' + fmtDatum(st.sessie.datum) + '</div></div>' +
+        '<button onclick="stopSessie()">Sessie beëindigen</button>';
+    } else {
+      $('sessie').innerHTML =
+        '<div><h2 style="margin-bottom:4px">Geen sessie</h2><div class="muted">Start een sessie om te kunnen stemmen. Alle scores worden bij de sessie bewaard.</div></div>' +
+        '<form id="sessieForm"><input id="sNaam" placeholder="Naam van de sessie, bijv. Open podium Utrecht" maxlength="100" required>' +
+        '<button class="primair" type="submit">Start sessie</button></form>';
+      $('sessieForm').onsubmit = async e => {
+        e.preventDefault();
+        const r = await api('POST', '/api/sessions', { naam: $('sNaam').value });
+        if (!r.ok) alert((await r.json()).error || 'Starten mislukt');
+      };
+    }
+
+    $('sessies').innerHTML = st.sessies.length ? st.sessies.map(s =>
+      '<details class="ses"' + (s.id === (st.sessie && st.sessie.id) ? ' open' : '') + '>' +
+        '<summary><span><strong>' + esc(s.naam) + '</strong>' + (s.gestopt ? '' : '<span class="label">bezig</span>') + '</span>' +
+        '<span class="muted">' + fmtDatum(s.datum) + ' · ' + fmtTijd(s.gestart) + (s.gestopt ? '–' + fmtTijd(s.gestopt) : '') + '</span></summary>' +
+        (s.grappen.length ? '<ol class="rang">' + s.grappen.map(g =>
+          '<li><strong>Grap ' + g.nummer + '</strong> ' + esc(g.titel) + ' — <span class="muted">' + pct(g.score) + '% goed (👍 ' + g.score.goed + ' · 👎 ' + g.score.slecht + ')</span></li>').join('') + '</ol>'
+          : '<p class="muted">Geen stemmen.</p>') +
+        '<div class="acties" style="margin-top:4px"><button class="klein" onclick="exportSessie(' + s.id + ')">Download JSON</button>' +
+        '<button class="klein" onclick="verwijderSessie(' + s.id + ')">Verwijderen</button></div>' +
+      '</details>').join('') : '<p class="muted">Nog geen sessies.</p>';
+  }
+
+  window.stopSessie = async () => {
+    if (confirm('Sessie "' + st.sessie.naam + '" beëindigen? De scores blijven bewaard.')) await api('POST', '/api/sessions/stop');
+  };
+  window.verwijderSessie = async id => {
+    const s = st.sessies.find(x => x.id === id);
+    if (confirm('Sessie "' + s.naam + '" en alle scores ervan definitief verwijderen?')) await api('DELETE', '/api/sessions/' + id);
+  };
+  window.exportSessie = async id => {
+    const s = await (await api('GET', '/api/sessions/' + id)).json();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' }));
+    a.download = 'grappenscore-' + s.datum + '-' + s.naam.replace(/[^\w-]+/g, '_') + '.json';
+    a.click();
+  };
+
   function render() {
+    renderSessie();
     const a = st.jokes.find(j => j.id === st.jokeId);
     const idx = a ? st.jokes.indexOf(a) : -1;
     const volgende = st.jokes[idx + 1];
 
-    if (!a) {
+    if (!st.sessie) {
+      $('actief').innerHTML = '<h2>Actieve grap</h2><p class="muted">Start eerst een sessie hierboven.</p>';
+    } else if (!a) {
       $('actief').innerHTML = '<h2>Actieve grap</h2><p class="muted">Geen grap actief. Luisteraars zien "Wachten op de volgende grap".</p>' +
         (st.jokes[0] ? '<div class="acties"><button class="primair" onclick="activeer(' + st.jokes[0].id + ')">Start met grap ' + st.jokes[0].nummer + '</button></div>' : '');
     } else {
@@ -178,7 +246,7 @@
         '<div><div class="t">' + esc(j.titel || 'Zonder titel') + '</div><div class="o">' + esc(j.omschrijving) + '</div>' +
           '<div class="sc"><span style="color:var(--goed)">👍 ' + j.score.goed + '</span> · <span style="color:var(--slecht)">👎 ' + j.score.slecht + '</span></div></div>' +
         '<div class="knop">' +
-          (j.id === st.jokeId ? '<button class="klein" disabled>Actief</button>' : '<button class="klein primair" onclick="activeer(' + j.id + ')">Activeer</button>') +
+          (j.id === st.jokeId ? '<button class="klein" disabled>Actief</button>' : '<button class="klein primair" onclick="activeer(' + j.id + ')"' + (st.sessie ? '' : ' disabled title="Start eerst een sessie"') + '>Activeer</button>') +
           '<button class="klein" onclick="bewerk(' + j.id + ')">Bewerk</button>' +
           '<button class="klein" onclick="verwijder(' + j.id + ')" title="Verwijderen">✕</button>' +
         '</div>' +
@@ -194,7 +262,7 @@
   window.activeer = id => socket.emit('activate', id);
   window.verwijder = async id => {
     const j = st.jokes.find(x => x.id === id);
-    if (confirm('Grap ' + j.nummer + ' en de stemmen erop verwijderen?')) await api('DELETE', '/api/jokes/' + id);
+    if (confirm('Grap ' + j.nummer + ' verwijderen? Scores in sessies blijven bewaard.')) await api('DELETE', '/api/jokes/' + id);
   };
   window.bewerk = id => {
     const j = st.jokes.find(x => x.id === id);

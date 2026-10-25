@@ -5,6 +5,13 @@ Luisteraars geven met hun telefoon een 👍 **goed** of 👎 **slecht** op de gr
 - **`/`**: de luisterpagina. Toont alleen het nummer van de actieve grap en twee knoppen.
 - **`/regie`**: de presentatorpagina, achter een pincode. Hier voeg je grappen toe, met een nummer, een titel en een omschrijving die alleen jij ziet. Je activeert de grap die je gaat vertellen, ziet de stemmen live binnenkomen, sluit of heropent het stemmen en bekijkt de ranglijst.
 
+## Sessies
+
+- In `/regie` start je eerst een **sessie** met een naam (bijv. "Open podium Utrecht"). De datum wordt automatisch opgeslagen.
+- Stemmen kan alleen als er een sessie loopt. Elke stem wordt bewaard bij de sessie, dus elke avond heeft een eigen uitslag.
+- Met **Sessie beëindigen** stop je de sessie. De scores blijven bewaard en staan onder **Sessies**, met per sessie de ranglijst, een knop **Download JSON** en een knop **Verwijderen**.
+- Via de API: `GET /api/sessions` (alle sessies met uitslag) en `GET /api/sessions/:id`, allebei met de header `x-pin`.
+
 ## Synchronisatie
 
 - Er is altijd hooguit één grap actief. Als de presentator op **Activeer** of **Volgende →** tikt, springt elke telefoon direct naar het nieuwe nummer. De telefoon trilt daarbij kort.
