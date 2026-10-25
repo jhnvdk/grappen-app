@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16130f">
+<title>Grappenscore</title>
+<style>
+  :root {
+    --bg: #16130f; --fg: #f6efe3; --muted: #a89f90; --line: #3a332a;
+    --goed: #3fbf6f; --slecht: #e0533d; --accent: #f2b632;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; min-height: 100dvh;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  header { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--muted); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--slecht); margin-right: 6px; }
+  .dot.on { background: var(--goed); }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
+  .label { text-transform: uppercase; letter-spacing: .2em; font-size: 13px; color: var(--muted); }
+  .nummer { font-size: min(44vw, 260px); font-weight: 800; line-height: .9; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .status { min-height: 1.5em; color: var(--muted); font-size: 16px; }
+  .knoppen { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 480px; margin: 0 auto; }
+  button.stem {
+    border: 3px solid var(--line); background: transparent; color: var(--fg);
+    border-radius: 20px; padding: 22px 8px; font-size: 20px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+    transition: transform .08s, background .15s, border-color .15s;
+  }
+  button.stem span { font-size: 52px; line-height: 1; }
+  button.stem:active { transform: scale(.96); }
+  button.stem:disabled { opacity: .35; }
+  button.goed.gekozen { background: var(--goed); border-color: var(--goed); color: #0d1f13; }
+  button.slecht.gekozen { background: var(--slecht); border-color: var(--slecht); color: #2a0d07; }
+  .wacht { font-size: 22px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <div>Grappenscore</div>
+    <div><span class="dot" id="dot"></span><span id="conn">verbinden…</span></div>
+  </header>
+
+  <main id="main">
+    <div class="wacht">Wachten op de volgende grap…</div>
+  </main>
+
+  <div class="knoppen">
+    <button class="stem goed" id="goed" disabled><span>👍</span>Goed</button>
+    <button class="stem slecht" id="slecht" disabled><span>👎</span>Slecht</button>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  let voterId;
+  try { voterId = localStorage.getItem('voterId'); } catch {}
+  if (!voterId) {
+    voterId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now());
+    try { localStorage.setItem('voterId', voterId); } catch {}
+  }
+
+  const socket = io();
+  const $ = id => document.getElementById(id);
+  let state = { jokeId: null, nummer: null, open: false };
+  let mijnStem = null;
+
+  socket.on('connect', () => { $('dot').classList.add('on'); $('conn').textContent = 'live'; });
+  socket.on('disconnect', () => { $('dot').classList.remove('on'); $('conn').textContent = 'verbinding kwijt'; });
+
+  socket.on('state', s => {
+    const gewisseld = s.jokeId !== state.jokeId;
+    state = s;
+    if (gewisseld) {
+      mijnStem = null;
+      if (s.jokeId) socket.emit('my-vote', { voterId, jokeId: s.jokeId }, v => { mijnStem = v; render(); });
+      if (navigator.vibrate && s.jokeId) navigator.vibrate(60);
+    }
+    render();
+  });
+
+  function render() {
+    if (!state.jokeId) {
+      $('main').innerHTML = '<div class="wacht">Wachten op de volgende grap…</div>';
+    } else {
+      const tekst = !state.open ? 'Stemmen is gesloten'
+        : mijnStem ? 'Je stem is binnen — je kunt nog wisselen'
+        : 'Wat vond je ervan?';
+      $('main').innerHTML =
+        '<div class="label">Grap</div>' +
+        '<div class="nummer">' + state.nummer + '</div>' +
+        '<div class="status">' + tekst + '</div>';
+    }
+    const kan = !!state.jokeId && state.open;
+    for (const k of ['goed', 'slecht']) {
+      $(k).disabled = !kan;
+      $(k).classList.toggle('gekozen', mijnStem === k);
+    }
+  }
+
+  function stem(keuze) {
+    const jokeId = state.jokeId;
+    mijnStem = keuze; render();
+    socket.emit('vote', { voterId, jokeId, keuze }, r => {
+      if (!r.ok) { mijnStem = null; render(); }
+    });
+  }
+  $('goed').onclick = () => stem('goed');
+  $('slecht').onclick = () => stem('slecht');
+</script>
+</body>
+</html>

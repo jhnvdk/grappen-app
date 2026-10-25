@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grappenscore – regie</title>
+<style>
+  :root {
+    --bg: #f7f3ec; --card: #fffdf9; --fg: #1d1a16; --muted: #786f62; --line: #e4dccf;
+    --goed: #2f9e5b; --slecht: #d0452f; --accent: #e5a50a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16130f; --card: #201c17; --fg: #f6efe3; --muted: #a89f90; --line: #3a332a; --accent: #f2b632; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 12px; }
+  button { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); padding: 8px 14px; cursor: pointer; }
+  button.primair { background: var(--accent); border-color: var(--accent); color: #1d1a16; font-weight: 700; }
+  button.klein { padding: 4px 10px; font-size: 13px; }
+  button:disabled { opacity: .4; cursor: default; }
+  input, textarea { font: inherit; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+  textarea { min-height: 70px; resize: vertical; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+
+  /* actieve grap */
+  .actief .nr { font-size: 64px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
+  .actief .titel { font-size: 22px; font-weight: 700; margin: 6px 0 8px; }
+  .actief .oms { font-size: 18px; line-height: 1.5; white-space: pre-wrap; }
+  .balk { display: flex; height: 34px; border-radius: 8px; overflow: hidden; background: var(--line); margin: 16px 0 6px; }
+  .balk .g { background: var(--goed); } .balk .s { background: var(--slecht); }
+  .telling { display: flex; justify-content: space-between; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .telling .g { color: var(--goed); } .telling .s { color: var(--slecht); }
+  .acties { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+  /* lijst */
+  .grap { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .grap:first-child { border-top: 0; }
+  .grap .n { font-size: 22px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+  .grap.is-actief .n { color: var(--accent); }
+  .grap .t { font-weight: 600; }
+  .grap .o { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .grap .sc { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .grap .knop { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .rang li { padding: 4px 0; font-variant-numeric: tabular-nums; }
+
+  #login { max-width: 320px; margin: 15vh auto; }
+  .fout { color: var(--slecht); font-size: 14px; min-height: 1.2em; margin-top: 6px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--slecht); margin-right: 6px; }
+  .dot.on { background: var(--goed); }
+</style>
+</head>
+<body>
+
+<div id="login" class="card">
+  <h1>Regie</h1>
+  <label for="pin">Pincode</label>
+  <input id="pin" type="password" inputmode="numeric" autocomplete="current-password">
+  <div class="fout" id="loginFout"></div>
+  <button class="primair" id="loginKnop" style="margin-top:8px;width:100%">Inloggen</button>
+</div>
+
+<div id="app" class="wrap" hidden>
+  <header>
+    <div>
+      <h1>Grappenscore · regie</h1>
+      <div class="muted">Luisteraars gaan naar <strong id="url"></strong></div>
+    </div>
+    <div class="muted"><span class="dot" id="dot"></span><span id="conn">verbinden…</span></div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <section class="card actief" id="actief"></section>
+      <section class="card" style="margin-top:16px">
+        <h2>Ranglijst</h2>
+        <ol class="rang" id="rang"></ol>
+      </section>
+    </div>
+
+    <div>
+      <section class="card">
+        <h2>Grappen</h2>
+        <div id="lijst"></div>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <h2 id="formTitel">Grap toevoegen</h2>
+        <form id="form">
+          <input type="hidden" id="fId">
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px">
+            <div><label for="fNr">Nummer</label><input id="fNr" type="number" min="1" placeholder="auto"></div>
+            <div><label for="fTitel">Titel</label><input id="fTitel" placeholder="Bijv. De kip en de weg"></div>
+          </div>
+          <label for="fOms">Omschrijving (alleen zichtbaar voor jou)</label>
+          <textarea id="fOms" placeholder="De grap zelf, of steekwoorden om hem te vertellen"></textarea>
+          <div class="acties">
+            <button class="primair" type="submit" id="fOpslaan">Toevoegen</button>
+            <button type="button" id="fAnnuleer" hidden>Annuleren</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  let pin = '';
+  try { pin = sessionStorage.getItem('pin') || ''; } catch {}
+  let st = { jokes: [], jokeId: null, open: false };
+  const socket = io({ autoConnect: false });
+
+  $('url').textContent = location.host;
+
+  async function login(p) {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: p }) });
+    const { ok } = await r.json();
+    if (!ok) { $('loginFout').textContent = 'Onjuiste pincode'; return; }
+    pin = p;
+    try { sessionStorage.setItem('pin', p); } catch {}
+    $('login').hidden = true; $('app').hidden = false;
+    socket.connect();
+  }
+  $('loginKnop').onclick = () => login($('pin').value);
+  $('pin').onkeydown = e => { if (e.key === 'Enter') login($('pin').value); };
+  if (pin) login(pin);
+
+  socket.on('connect', () => {
+    $('dot').classList.add('on'); $('conn').textContent = 'live';
+    socket.emit('join-regie', pin, ok => { if (!ok) location.reload(); });
+  });
+  socket.on('disconnect', () => { $('dot').classList.remove('on'); $('conn').textContent = 'verbinding kwijt'; });
+  socket.on('admin', s => { st = s; render(); });
+
+  const api = (method, url, body) => fetch(url, {
+    method, headers: { 'Content-Type': 'application/json', 'x-pin': pin }, body: body ? JSON.stringify(body) : undefined,
+  });
+
+  function pct(s) { return s.totaal ? Math.round(100 * s.goed / s.totaal) : 0; }
+
+  function render() {
+    const a = st.jokes.find(j => j.id === st.jokeId);
+    const idx = a ? st.jokes.indexOf(a) : -1;
+    const volgende = st.jokes[idx + 1];
+
+    if (!a) {
+      $('actief').innerHTML = '<h2>Actieve grap</h2><p class="muted">Geen grap actief. Luisteraars zien "Wachten op de volgende grap".</p>' +
+        (st.jokes[0] ? '<div class="acties"><button class="primair" onclick="activeer(' + st.jokes[0].id + ')">Start met grap ' + st.jokes[0].nummer + '</button></div>' : '');
+    } else {
+      const s = a.score, p = pct(s);
+      $('actief').innerHTML =
+        '<h2>Actieve grap · stemmen ' + (st.open ? 'open' : 'gesloten') + '</h2>' +
+        '<div class="nr">' + a.nummer + '</div>' +
+        '<div class="titel">' + esc(a.titel || 'Zonder titel') + '</div>' +
+        '<div class="oms">' + esc(a.omschrijving) + '</div>' +
+        '<div class="balk"><div class="g" style="width:' + (s.totaal ? p : 0) + '%"></div><div class="s" style="width:' + (s.totaal ? 100 - p : 0) + '%"></div></div>' +
+        '<div class="telling"><span class="g">👍 ' + s.goed + '</span><span class="muted">' + s.totaal + ' stemmen · ' + p + '% goed</span><span class="s">' + s.slecht + ' 👎</span></div>' +
+        '<div class="acties">' +
+          '<button onclick="socket.emit(\'set-open\',' + !st.open + ')">' + (st.open ? 'Stemmen sluiten' : 'Stemmen heropenen') + '</button>' +
+          (volgende ? '<button class="primair" onclick="activeer(' + volgende.id + ')">Volgende: grap ' + volgende.nummer + ' →</button>' : '') +
+          '<button onclick="socket.emit(\'deactivate\')">Pauze</button>' +
+        '</div>';
+    }
+
+    $('lijst').innerHTML = st.jokes.length ? st.jokes.map(j =>
+      '<div class="grap' + (j.id === st.jokeId ? ' is-actief' : '') + '">' +
+        '<div class="n">' + j.nummer + '</div>' +
+        '<div><div class="t">' + esc(j.titel || 'Zonder titel') + '</div><div class="o">' + esc(j.omschrijving) + '</div>' +
+          '<div class="sc"><span style="color:var(--goed)">👍 ' + j.score.goed + '</span> · <span style="color:var(--slecht)">👎 ' + j.score.slecht + '</span></div></div>' +
+        '<div class="knop">' +
+          (j.id === st.jokeId ? '<button class="klein" disabled>Actief</button>' : '<button class="klein primair" onclick="activeer(' + j.id + ')">Activeer</button>') +
+          '<button class="klein" onclick="bewerk(' + j.id + ')">Bewerk</button>' +
+          '<button class="klein" onclick="verwijder(' + j.id + ')" title="Verwijderen">✕</button>' +
+        '</div>' +
+      '</div>').join('') : '<p class="muted">Nog geen grappen. Voeg er hieronder een toe.</p>';
+
+    const gestemd = st.jokes.filter(j => j.score.totaal > 0)
+      .sort((x, y) => (y.score.goed - y.score.slecht) - (x.score.goed - x.score.slecht) || pct(y.score) - pct(x.score));
+    $('rang').innerHTML = gestemd.length ? gestemd.map(j =>
+      '<li><strong>Grap ' + j.nummer + '</strong> ' + esc(j.titel) + ' — <span class="muted">' + pct(j.score) + '% goed (' + j.score.goed + '/' + j.score.totaal + ')</span></li>').join('')
+      : '<li class="muted" style="list-style:none;margin-left:-1.5em">Nog geen stemmen.</li>';
+  }
+
+  window.activeer = id => socket.emit('activate', id);
+  window.verwijder = async id => {
+    const j = st.jokes.find(x => x.id === id);
+    if (confirm('Grap ' + j.nummer + ' en de stemmen erop verwijderen?')) await api('DELETE', '/api/jokes/' + id);
+  };
+  window.bewerk = id => {
+    const j = st.jokes.find(x => x.id === id);
+    $('fId').value = j.id; $('fNr').value = j.nummer; $('fTitel').value = j.titel; $('fOms').value = j.omschrijving;
+    $('formTitel').textContent = 'Grap ' + j.nummer + ' bewerken';
+    $('fOpslaan').textContent = 'Opslaan'; $('fAnnuleer').hidden = false;
+    $('fTitel').focus();
+  };
+  function leegForm() {
+    $('form').reset(); $('fId').value = '';
+    $('formTitel').textContent = 'Grap toevoegen'; $('fOpslaan').textContent = 'Toevoegen'; $('fAnnuleer').hidden = true;
+  }
+  $('fAnnuleer').onclick = leegForm;
+  $('form').onsubmit = async e => {
+    e.preventDefault();
+    const body = { nummer: $('fNr').value, titel: $('fTitel').value, omschrijving: $('fOms').value };
+    const id = $('fId').value;
+    await api(id ? 'PUT' : 'POST', id ? '/api/jokes/' + id : '/api/jokes', body);
+    leegForm();
+  };
+</script>
+</body>
+</html>
