@@ -22,8 +22,6 @@
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--slecht); margin-right: 6px; }
   .dot.on { background: var(--goed); }
   main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
-  .label { text-transform: uppercase; letter-spacing: .2em; font-size: 13px; color: var(--muted); }
-  .nummer { font-size: min(44vw, 260px); font-weight: 800; line-height: .9; color: var(--accent); font-variant-numeric: tabular-nums; }
   .status { min-height: 1.5em; color: var(--muted); font-size: 16px; }
   .knoppen { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 480px; margin: 0 auto; }
   button.stem {
@@ -90,10 +88,7 @@
       const tekst = !state.open ? 'Stemmen is gesloten'
         : mijnStem ? 'Je stem is binnen — je kunt nog wisselen'
         : 'Wat vond je ervan?';
-      $('main').innerHTML =
-        '<div class="label">Grap</div>' +
-        '<div class="nummer">' + state.nummer + '</div>' +
-        '<div class="status">' + tekst + '</div>';
+      $('main').innerHTML = '<div class="status">' + tekst + '</div>';
     }
     const kan = !!state.jokeId && state.open;
     for (const k of ['goed', 'slecht']) {
